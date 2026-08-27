@@ -20,6 +20,11 @@ function assignmentMode(device, value) {
     return fzAssignmentMode.convert(undefined, {device, data: {0x00aa: value}});
 }
 
+test("preserves the canonical model identity used by the frontend image catalog", () => {
+    assert.equal(definition.model, "CR11S8UZ");
+    assert.equal(definition.vendor, "ORVIBO");
+});
+
 function registryDeviceClass() {
     return class RegistryDevice {
         static devices = [];

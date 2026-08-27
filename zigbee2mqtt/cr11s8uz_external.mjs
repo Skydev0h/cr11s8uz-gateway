@@ -954,7 +954,7 @@ const gatewayActionModeOption = e
 
 const definition = {
     zigbeeModel: ["3c4e4fc81ed442efaf69353effcdfc5f", "51725b7bcba945c8a595b325127461e9"],
-    model: "CR11S8UZ-router",
+    model: "CR11S8UZ",
     vendor: "ORVIBO",
     description: "Smart sticker switch with decoded action-table protocol",
     extend: [m.deviceAddCustomCluster(CLUSTER_NAME, cr11Cluster)],

@@ -6,6 +6,12 @@ Versions 0.1.0 through 0.9.1 were internal laboratory builds rather than
 public releases. Their history is reconstructed from preserved firmware
 backups and physical captures made between 2026-08-24 and 2026-08-26.
 
+## Unreleased
+
+- Preserve the canonical `CR11S8UZ` model identity in the external converter
+  so Zigbee2MQTT retains the standard device image while exposing all eight
+  buttons and gateway configuration controls.
+
 ## 0.9.3 - 2026-08-27
 
 - Replace the channel-25-only join configuration with standard BDB Network

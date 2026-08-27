@@ -165,9 +165,10 @@ For a complete stock join:
 4. Fast blinking means the remote is searching. Keep it awake if interview
    needs another upper press.
 
-The remote should be identified as `CR11S8UZ-router` by ORVIBO. A full stock
-join clears both proprietary action tables, so gateway mode must be configured
-afterward.
+The remote should be identified as `CR11S8UZ` by ORVIBO. The canonical model
+identity lets the Zigbee2MQTT frontend reuse its standard device image. A full
+stock join clears both proprietary action tables, so gateway mode must be
+configured afterward.
 
 ## 6. Route all buttons through the gateway
 
