@@ -1,0 +1,21 @@
+idf_component_register(
+    SRCS
+        "alarm_timer.c"
+        "cr11_bridge.c"
+        "cr11_debug.c"
+        "cr11_event.c"
+        "cr11_gateway_packet.c"
+        "cr11_usb_frame.c"
+        "cr11_usb_transport.c"
+        "cr11_ui_runtime.c"
+        "cr11_ui_state.c"
+    INCLUDE_DIRS "."
+    PRIV_REQUIRES
+        esp_app_format
+        esp_driver_gpio
+        esp_driver_uart
+        esp_driver_usb_serial_jtag
+        esp_system
+        esp_timer
+        nvs_flash
+)

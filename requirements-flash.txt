@@ -1,0 +1,18 @@
+# Locked esptool 5.3.1 environment, refreshed 2026-08-27.
+bitarray==3.10.1
+bitstring==4.4.0
+cffi==2.1.1
+click==8.5.0
+cryptography==50.0.1
+esptool==5.3.1
+intelhex==2.3.0
+markdown-it-py==4.2.0
+mdurl==0.1.2
+pycparser==3.0
+Pygments==2.21.0
+pyserial==3.5
+PyYAML==6.0.3
+reedsolo==1.7.0
+rich==15.0.0
+rich-click==1.9.8
+tibs==0.5.7

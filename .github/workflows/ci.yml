@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository-and-runtime-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Enforce repository policy
+        run: python3 scripts/check_repository.py
+
+      - name: Test helper tools
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Test portable firmware logic
+        run: make -C firmware host-test
+
+      - name: Verify prebuilt release
+        run: python3 scripts/flash_firmware.py factory --port /dev/ttyACM0 --dry-run
+
+      - name: Test Zigbee2MQTT integration
+        run: python3 scripts/test_z2m.py
+
+  firmware-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Build ESP32-C6 firmware
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5
+        with:
+          esp_idf_version: v5.5.4
+          target: esp32c6
+          path: firmware
+
+      - name: Verify reproducible prebuilt release
+        run: |
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --disable-pip-version-check -r requirements-flash.txt
+          .venv/bin/python scripts/build_release.py --build-dir firmware/build --verify-current

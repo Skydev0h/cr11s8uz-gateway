@@ -1,0 +1,52 @@
+menu "CR11 bridge configuration"
+
+config CR11_BRIDGE_PRIMARY_CHANNEL_MASK
+    hex "Primary BDB commissioning channel mask"
+    range 0x00000800 0x07fff800
+    default 0x07fff800
+    help
+        Bits 11 through 26 select the channels scanned first by BDB Network
+        Steering. Channels not selected here are used as the secondary
+        fallback set. The public release scans all 16 channels as primary.
+
+config CR11_BRIDGE_RETRY_MS
+    int "Commissioning retry delay in milliseconds"
+    range 1000 60000
+    default 5000
+
+config CR11_UI_BOOT_GPIO
+    int "BOOT button GPIO"
+    range 0 30
+    default 9
+    help
+        Active-low BOOT button input on ESP32-C6-DevKitC-1.
+
+config CR11_UI_RGB_GPIO
+    int "Addressable RGB LED GPIO"
+    range 0 30
+    default 8
+    help
+        Data GPIO for the onboard addressable RGB LED.
+
+config CR11_UI_LED_BRIGHTNESS
+    int "Maximum RGB component brightness"
+    range 1 255
+    default 32
+    help
+        Maximum component value used for the status LED. Half-yellow uses
+        half this value.
+
+config CR11_UI_UART_RX_BUFFER
+    int "UART command RX buffer size"
+    range 256 4096
+    default 512
+
+config CR11_UI_VIRTUAL_HOLD_LIMIT_MS
+    int "Maximum virtual BOOT hold"
+    range 6000 60000
+    default 15000
+    help
+        Safety auto-release for a UART-injected BOOT press if the sender
+        disconnects before issuing `boot release`.
+
+endmenu

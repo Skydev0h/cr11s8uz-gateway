@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+firmware/build/
+firmware/build-host/
+firmware/managed_components/
+firmware/sdkconfig
+firmware/sdkconfig.old
+
+dist/
+*.backup-*
+
+# Zigbee2MQTT runtime data must never be committed.
+configuration.yaml
+coordinator_backup.json
+database.db
+state.json
+log/
