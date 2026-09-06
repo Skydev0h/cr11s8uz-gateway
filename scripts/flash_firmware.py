@@ -16,20 +16,31 @@ from pathlib import Path
 from typing import Callable
 
 if __package__:
-    from .build_release import project_version
+    from .build_release import (
+        BOARD_PROFILES,
+        DEFAULT_BOARD,
+        project_version,
+        release_directory as release_directory_for,
+    )
 else:
-    from build_release import project_version
+    from build_release import (
+        BOARD_PROFILES,
+        DEFAULT_BOARD,
+        project_version,
+        release_directory as release_directory_for,
+    )
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_VERSION = project_version()
-RELEASE_DIRECTORY = REPOSITORY_ROOT / "firmware" / "prebuilt" / f"v{FIRMWARE_VERSION}"
+RELEASE_DIRECTORY = release_directory_for(FIRMWARE_VERSION, DEFAULT_BOARD)
 FACTORY_IMAGE = f"cr11s8uz-gateway-v{FIRMWARE_VERSION}.factory.bin"
 APPLICATION_IMAGE = f"cr11s8uz-gateway-v{FIRMWARE_VERSION}.app.bin"
 BINARY_FILES = {FACTORY_IMAGE, APPLICATION_IMAGE, "bootloader.bin", "partition-table.bin"}
 REQUIRED_FILES = {*BINARY_FILES, "manifest.json"}
 CHECKSUM_LINE = re.compile(r"^([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._-]*)$")
 ALLOWED_BAUD_RATES = (115200, 230400, 460800, 921600)
+EXPECTED_RGB_ORDER = BOARD_PROFILES[DEFAULT_BOARD]["rgb_order"]
 EXPECTED_ZIGBEE_CONFIGURATION = {
     "commissioning_channel_mask": "0x07fff800",
     "commissioning_channels": list(range(11, 27)),
@@ -64,7 +75,10 @@ def load_checksums(release_directory: Path = RELEASE_DIRECTORY) -> dict[str, str
     return checksums
 
 
-def verify_release(release_directory: Path = RELEASE_DIRECTORY) -> dict[str, object]:
+def verify_release(
+    release_directory: Path = RELEASE_DIRECTORY,
+    board: str = DEFAULT_BOARD,
+) -> dict[str, object]:
     checksums = load_checksums(release_directory)
     if set(checksums) != REQUIRED_FILES:
         missing = sorted(REQUIRED_FILES - set(checksums))
@@ -109,6 +123,17 @@ def verify_release(release_directory: Path = RELEASE_DIRECTORY) -> dict[str, obj
     zigbee = manifest.get("zigbee")
     if zigbee != EXPECTED_ZIGBEE_CONFIGURATION:
         raise FlashError("Release manifest has an invalid Zigbee configuration")
+    expected_order = BOARD_PROFILES[board]["rgb_order"]
+    if manifest.get("rgb_order") != expected_order:
+        raise FlashError(
+            f"Release manifest LED colour order does not match board profile "
+            f"{board!r}; expected {expected_order}"
+        )
+    if manifest.get("board_profile") != board:
+        raise FlashError(
+            f"Release manifest was built for board profile "
+            f"{manifest.get('board_profile')!r}, not {board!r}"
+        )
     binary_hashes = manifest.get("sha256")
     if not isinstance(binary_hashes, dict) or set(binary_hashes) != BINARY_FILES:
         raise FlashError("Release manifest has an unexpected binary hash set")
@@ -142,7 +167,12 @@ def esptool_prefix(port: str, baud: int) -> list[str]:
     ]
 
 
-def flash_commands(mode: str, port: str, baud: int) -> list[list[str]]:
+def flash_commands(
+    mode: str,
+    port: str,
+    baud: int,
+    directory: Path = RELEASE_DIRECTORY,
+) -> list[list[str]]:
     prefix = esptool_prefix(port, baud)
     flash_options = ["--flash-mode", "dio", "--flash-freq", "80m", "--flash-size", "8MB"]
     if mode == "factory":
@@ -152,7 +182,7 @@ def flash_commands(mode: str, port: str, baud: int) -> list[list[str]]:
             "--erase-all",
             *flash_options,
             "0x0",
-            str(RELEASE_DIRECTORY / FACTORY_IMAGE),
+            str(directory / FACTORY_IMAGE),
         ]]
     if mode == "upgrade":
         return [[
@@ -160,7 +190,7 @@ def flash_commands(mode: str, port: str, baud: int) -> list[list[str]]:
             "write-flash",
             *flash_options,
             "0x10000",
-            str(RELEASE_DIRECTORY / APPLICATION_IMAGE),
+            str(directory / APPLICATION_IMAGE),
         ]]
     raise FlashError(f"Unsupported flash mode: {mode}")
 
@@ -176,6 +206,12 @@ def confirm_factory(input_function: Callable[[str], str] = input) -> None:
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("factory", "upgrade"))
+    parser.add_argument(
+        "--board",
+        choices=sorted(BOARD_PROFILES),
+        default=DEFAULT_BOARD,
+        help="board profile whose prebuilt release is flashed",
+    )
     parser.add_argument("--port", required=True, help="stable serial path or COM port for the USB-to-UART connector")
     parser.add_argument("--baud", type=int, choices=ALLOWED_BAUD_RATES, default=460800)
     parser.add_argument("--yes", action="store_true", help="skip the destructive factory confirmation")
@@ -186,8 +222,9 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_arguments(argv)
     try:
-        manifest = verify_release()
-        commands = flash_commands(args.mode, args.port, args.baud)
+        directory = release_directory_for(FIRMWARE_VERSION, args.board)
+        manifest = verify_release(directory, args.board)
+        commands = flash_commands(args.mode, args.port, args.baud, directory)
         if args.mode == "factory" and not args.yes and not args.dry_run:
             confirm_factory()
         for command in commands:
@@ -198,7 +235,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {error}", file=sys.stderr)
         return 1
     print(
-        f"CR11Gateway firmware v{FIRMWARE_VERSION} "
+        f"CR11Gateway firmware v{FIRMWARE_VERSION} for board profile "
+        f"{args.board} ({manifest.get('tested_board')}) "
         f"{'plan verified' if args.dry_run else 'flashed successfully'} "
         "with all-channel Zigbee commissioning (11-26).",
     )

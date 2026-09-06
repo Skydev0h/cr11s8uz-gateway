@@ -54,8 +54,9 @@ coordinator.
 |---|---|
 | Remote | ORVIBO CR11S8UZ, firmware `v3.1.04_20160520` |
 | Remote model IDs | `51725b7bcba945c8a595b325127461e9`, `3c4e4fc81ed442efaf69353effcdfc5f` |
-| Gateway board | ESP32-C6-DevKitC-1 v1.2, 8 MB flash |
-| Gateway firmware | `0.9.3`, built with ESP-IDF `5.5.4` |
+| Gateway board | ESP32-C6-DevKitC-1 v1.2, 8 MB flash (profile `devkitc1`) |
+| Additional board build | Waveshare ESP32-C6-Zero, 8 MB flash (profile `c6zero`, LED and flashing path only) |
+| Gateway firmware | `0.9.4`, built with ESP-IDF `5.5.4` |
 | Zigbee library | Espressif `esp-zigbee-lib 2.0.3` |
 | Zigbee2MQTT | `2.13.0` |
 | zigbee-herdsman-converters | `26.90.0` in the tested image |
@@ -116,8 +117,12 @@ normal names in both modes.
 ## Repository layout
 
 - [`firmware/`](firmware/) contains the complete ESP-IDF source and host tests.
-- [`firmware/prebuilt/v0.9.3/`](firmware/prebuilt/v0.9.3/) contains the factory
-  and application-only release images, a manifest, and SHA-256 checksums.
+- [`firmware/prebuilt/v0.9.4/`](firmware/prebuilt/v0.9.4/) contains the factory
+  and application-only release images, a manifest, and SHA-256 checksums for the
+  reference board.
+- [`firmware/prebuilt/v0.9.4-c6zero/`](firmware/prebuilt/v0.9.4-c6zero/) is the
+  same release built for the Waveshare ESP32-C6-Zero, whose addressable LED uses
+  the `RGB` byte order.
 - [`zigbee2mqtt/`](zigbee2mqtt/) contains two external converters and one
   external extension.
 - [`scripts/`](scripts/) contains guarded install, flash, release, and policy

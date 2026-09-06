@@ -16,6 +16,7 @@ EXCLUDED_DIRECTORIES = {
     ".venv",
     "__pycache__",
     "build",
+    "build-c6zero",
     "build-host",
     "dist",
     "managed_components",

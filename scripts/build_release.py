@@ -25,6 +25,23 @@ SOURCE_ARTIFACTS = {
 }
 RELEASE_COMMISSIONING_CHANNEL_MASK = 0x07FFF800
 RELEASE_COMMISSIONING_CHANNELS = tuple(range(11, 27))
+BOARD_PROFILES = {
+    "devkitc1": {
+        "directory_suffix": "",
+        "rgb_order": "GRB",
+        "tested_board": "ESP32-C6-DevKitC-1 v1.2 with 8 MB flash",
+        "build_dir": "firmware/build",
+        "sdkconfig_defaults": ("sdkconfig.defaults",),
+    },
+    "c6zero": {
+        "directory_suffix": "-c6zero",
+        "rgb_order": "RGB",
+        "tested_board": "Waveshare ESP32-C6-Zero with 8 MB flash",
+        "build_dir": "firmware/build-c6zero",
+        "sdkconfig_defaults": ("sdkconfig.defaults", "sdkconfig.c6zero.defaults"),
+    },
+}
+DEFAULT_BOARD = "devkitc1"
 RELEASE_COMPARISON_IGNORES = {"README.md"}
 
 
@@ -48,7 +65,19 @@ def project_version() -> str:
     return match.group(1)
 
 
-def build_configuration(build: Path) -> dict[str, object]:
+def board_profile(board: str) -> dict[str, object]:
+    try:
+        return BOARD_PROFILES[board]
+    except KeyError:
+        raise ReleaseError(f"Unknown board profile: {board}") from None
+
+
+def release_directory(version: str, board: str = DEFAULT_BOARD) -> Path:
+    suffix = board_profile(board)["directory_suffix"]
+    return REPOSITORY_ROOT / "firmware" / "prebuilt" / f"v{version}{suffix}"
+
+
+def build_configuration(build: Path, board: str = DEFAULT_BOARD) -> dict[str, object]:
     path = build / "config" / "sdkconfig.json"
     try:
         configuration = json.loads(path.read_text(encoding="utf-8"))
@@ -73,6 +102,12 @@ def build_configuration(build: Path) -> dict[str, object]:
         raise ReleaseError("Release build must use the Zigbee End Device library")
     if configuration.get("APP_REPRODUCIBLE_BUILD") is not True:
         raise ReleaseError("Release build must enable reproducible ESP-IDF output")
+    expected_order = board_profile(board)["rgb_order"]
+    if configuration.get(f"CR11_UI_RGB_ORDER_{expected_order}") is not True:
+        raise ReleaseError(
+            f"Release build for board profile {board!r} must use the "
+            f"{expected_order} LED colour order"
+        )
     return configuration
 
 
@@ -109,7 +144,11 @@ def compare_release_directories(generated: Path, committed: Path) -> None:
         raise ReleaseError(f"Prebuilt release differs from this build: {mismatches}")
 
 
-def build_release(build_directory: Path, output_directory: Path) -> None:
+def build_release(
+    build_directory: Path,
+    output_directory: Path,
+    board: str = DEFAULT_BOARD,
+) -> None:
     build = build_directory.expanduser().resolve(strict=True)
     if not build.is_dir():
         raise ReleaseError(f"Build path is not a directory: {build}")
@@ -122,7 +161,8 @@ def build_release(build_directory: Path, output_directory: Path) -> None:
     version = project_version()
     if not VERSION_PATTERN.fullmatch(version):
         raise ReleaseError(f"Invalid project version: {version}")
-    configuration = build_configuration(build)
+    profile = board_profile(board)
+    configuration = build_configuration(build, board)
     app_source = build / "cr11_zigbee_bridge.bin"
     sources = {name: build / relative for name, relative in SOURCE_ARTIFACTS.items()}
     sources[f"cr11s8uz-gateway-v{version}.app.bin"] = app_source
@@ -171,7 +211,9 @@ def build_release(build_directory: Path, output_directory: Path) -> None:
             "project": "cr11s8uz-gateway",
             "version": version,
             "target": "esp32c6",
-            "tested_board": "ESP32-C6-DevKitC-1 v1.2 with 8 MB flash",
+            "tested_board": profile["tested_board"],
+            "board_profile": board,
+            "rgb_order": profile["rgb_order"],
             "zigbee": {
                 "commissioning_channel_mask": (
                     f"0x{RELEASE_COMMISSIONING_CHANNEL_MASK:08x}"
@@ -211,19 +253,29 @@ def build_release(build_directory: Path, output_directory: Path) -> None:
         raise
 
 
-def verify_current_release(build_directory: Path) -> Path:
+def verify_current_release(build_directory: Path, board: str = DEFAULT_BOARD) -> Path:
     version = project_version()
-    committed = REPOSITORY_ROOT / "firmware" / "prebuilt" / f"v{version}"
+    committed = release_directory(version, board)
     with tempfile.TemporaryDirectory(prefix="cr11-release-verify-") as temporary:
-        generated = Path(temporary) / f"v{version}"
-        build_release(build_directory, generated)
+        generated = Path(temporary) / committed.name
+        build_release(build_directory, generated, board)
         compare_release_directories(generated, committed)
     return committed
 
 
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build-dir", default="firmware/build", type=Path)
+    parser.add_argument(
+        "--board",
+        choices=sorted(BOARD_PROFILES),
+        default=DEFAULT_BOARD,
+        help="board profile whose LED colour order and build directory apply",
+    )
+    parser.add_argument(
+        "--build-dir",
+        type=Path,
+        help="ESP-IDF build directory; defaults to the board profile's directory",
+    )
     output = parser.add_mutually_exclusive_group()
     output.add_argument("--output-dir", type=Path)
     output.add_argument(
@@ -237,12 +289,13 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_arguments(argv)
     version = project_version()
+    build_dir = args.build_dir or Path(BOARD_PROFILES[args.board]["build_dir"])
     try:
         if args.verify_current:
-            output = verify_current_release(args.build_dir)
+            output = verify_current_release(build_dir, args.board)
         else:
-            output = args.output_dir or REPOSITORY_ROOT / "firmware" / "prebuilt" / f"v{version}"
-            build_release(args.build_dir, output)
+            output = args.output_dir or release_directory(version, args.board)
+            build_release(build_dir, output, args.board)
     except (ReleaseError, OSError, subprocess.CalledProcessError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

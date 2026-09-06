@@ -55,6 +55,11 @@ Then flash it:
   --port /dev/serial/by-id/YOUR_ESP32_C6_UART
 ```
 
+Boards other than the reference ESP32-C6-DevKitC-1 may need a different
+addressable-LED byte order. Add `--board c6zero` for the Waveshare
+ESP32-C6-Zero; the flasher refuses a release that does not match the profile you
+asked for. See [the firmware guide](FIRMWARE.md) for the list of profiles.
+
 Factory mode validates all SHA-256 checksums, asks you to type `ERASE`, erases
 the entire board, and writes one merged image at offset `0x0`. If automatic
 reset fails, hold BOOT, tap RESET, release BOOT, and retry. A lower baud rate is

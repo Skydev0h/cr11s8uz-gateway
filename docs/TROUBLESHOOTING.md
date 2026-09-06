@@ -16,7 +16,7 @@ rebuild with the correct `CR11_UI_BOOT_GPIO`.
 ## Yellow steering never joins
 
 - Confirm Zigbee2MQTT permit-join is open.
-- The supplied v0.9.3 image scans channels 11 through 26. Keep permit-join open
+- The supplied v0.9.4 image scans channels 11 through 26. Keep permit-join open
   long enough for the complete scan and subsequent interview.
 - Keep the gateway near the coordinator for initial commissioning.
 - Confirm no other process owns the coordinator.
@@ -158,6 +158,34 @@ creates a timestamped mode-0600 backup beside the destination. It never edits
   rejection.
 
 USB failure does not disable the Zigbee path.
+
+## A factory-new gateway pulses green instead of red
+
+A gateway that has never joined pulses **red** for 0.1 s once per second. If a
+freshly flashed board pulses **green** at that same fast rhythm, the firmware
+state is almost certainly correct and only the LED colour order is wrong: the
+board carries an `RGB` addressable LED while the image was built for `GRB`.
+
+Confirm it without any tooling. Yellow and blue use equal red and green
+components, so they render identically in both orders:
+
+1. Press and hold BOOT for less than a second. Half-bright **yellow** means the
+   state machine is healthy and only red and green are exchanged.
+2. Hold BOOT for one second and release. Network steering shows **yellow**
+   pulsing at 0.5 s on, 0.5 s off, again in either colour order.
+
+If both steps look yellow, flash the variant that matches the board:
+
+```sh
+python3 scripts/flash_firmware.py factory --board c6zero --port /dev/ttyACM0
+```
+
+If instead the BOOT hold produces no yellow at all, the problem is not the
+colour order. Check the LED data GPIO and the BOOT GPIO against
+**CR11 bridge configuration**; the defaults are GPIO 8 and GPIO 9.
+
+Flashing the wrong variant is harmless. Nothing but the LED colour changes, and
+reflashing the correct profile restores it.
 
 ## Sharing diagnostic logs
 

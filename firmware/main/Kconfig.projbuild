@@ -28,6 +28,26 @@ config CR11_UI_RGB_GPIO
     help
         Data GPIO for the onboard addressable RGB LED.
 
+choice CR11_UI_RGB_ORDER
+    prompt "Addressable RGB LED colour component order"
+    default CR11_UI_RGB_ORDER_GRB
+    help
+        Byte order the onboard addressable LED expects. The ESP32-C6-DevKitC-1
+        carries a GRB part, which is the released default. Some boards, such as
+        the Waveshare ESP32-C6-Zero, carry an RGB part; with the wrong setting
+        red and green are exchanged, so a factory-new device appears to pulse
+        green instead of red. Yellow and blue render identically in both
+        orders, which makes the BOOT hold and steering phases a reliable way to
+        confirm that only the colour order is wrong.
+
+config CR11_UI_RGB_ORDER_GRB
+    bool "GRB (WS2812, ESP32-C6-DevKitC-1)"
+
+config CR11_UI_RGB_ORDER_RGB
+    bool "RGB"
+
+endchoice
+
 config CR11_UI_LED_BRIGHTNESS
     int "Maximum RGB component brightness"
     range 1 255

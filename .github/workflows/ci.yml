@@ -33,7 +33,7 @@ jobs:
 
   firmware-build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -45,8 +45,17 @@ jobs:
           target: esp32c6
           path: firmware
 
-      - name: Verify reproducible prebuilt release
+      - name: Build ESP32-C6-Zero variant firmware
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5
+        with:
+          esp_idf_version: v5.5.4
+          target: esp32c6
+          path: firmware
+          command: idf.py -B build-c6zero -D SDKCONFIG=sdkconfig.c6zero -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c6zero.defaults" build
+
+      - name: Verify reproducible prebuilt releases
         run: |
           python3 -m venv .venv
           .venv/bin/python -m pip install --disable-pip-version-check -r requirements-flash.txt
-          .venv/bin/python scripts/build_release.py --build-dir firmware/build --verify-current
+          .venv/bin/python scripts/build_release.py --board devkitc1 --verify-current
+          .venv/bin/python scripts/build_release.py --board c6zero --verify-current

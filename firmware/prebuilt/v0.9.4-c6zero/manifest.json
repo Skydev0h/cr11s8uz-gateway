@@ -1,32 +1,34 @@
 {
+  "board_profile": "c6zero",
   "flash": {
     "frequency": "80m",
     "mode": "dio",
     "offsets": {
       "bootloader.bin": "0x0",
-      "cr11s8uz-gateway-v0.9.3.app.bin": "0x10000",
-      "cr11s8uz-gateway-v0.9.3.factory.bin": "0x0",
+      "cr11s8uz-gateway-v0.9.4.app.bin": "0x10000",
+      "cr11s8uz-gateway-v0.9.4.factory.bin": "0x0",
       "partition-table.bin": "0x8000"
     },
     "size": "8MB"
   },
   "project": "cr11s8uz-gateway",
+  "rgb_order": "RGB",
   "schema": 2,
   "sha256": {
     "bootloader.bin": "a1aa0066a63f408c9062d6df264520f5d7f4cb33b9e9e68c3c2d357dc743ea5e",
-    "cr11s8uz-gateway-v0.9.3.app.bin": "32ee30e7dad91a92b69a1c6a29a0fbd9c80d7d85246d619669c798eec5e7dec4",
-    "cr11s8uz-gateway-v0.9.3.factory.bin": "224ed82fbdc680cbca45f0bb2a82bb4bb695506d26b93a0e4a3ed6209f5f1fa8",
+    "cr11s8uz-gateway-v0.9.4.app.bin": "ca74499ce90c790c35e6589f03eb41469b6bfc251f93928ab60868f6a50e8739",
+    "cr11s8uz-gateway-v0.9.4.factory.bin": "f21796c7a390d9a99c113553982b16f8b9c6c92dcf796573075ade68beb395a8",
     "partition-table.bin": "d93d0845125dfe7e4d8374d7d4cfead80b0941c6dd80fbb3fa56169587e359a0"
   },
   "target": "esp32c6",
-  "tested_board": "ESP32-C6-DevKitC-1 v1.2 with 8 MB flash",
+  "tested_board": "Waveshare ESP32-C6-Zero with 8 MB flash",
   "toolchain": {
     "esp_idf": "5.5.4",
     "esp_zigbee_lib": "2.0.3",
     "led_strip": "3.0.3",
     "reproducible_build": true
   },
-  "version": "0.9.3",
+  "version": "0.9.4",
   "zigbee": {
     "commissioning_channel_mask": "0x07fff800",
     "commissioning_channels": [

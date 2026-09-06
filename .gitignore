@@ -3,9 +3,11 @@ __pycache__/
 *.py[cod]
 
 firmware/build/
+firmware/build-c6zero/
 firmware/build-host/
 firmware/managed_components/
 firmware/sdkconfig
+firmware/sdkconfig.c6zero
 firmware/sdkconfig.old
 
 dist/

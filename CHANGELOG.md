@@ -15,6 +15,27 @@ backups and physical captures made between 2026-08-24 and 2026-08-26.
   install with bounded backoff, and preserve the transport-cause tail of long
   setup errors instead of truncating the useful part.
 
+## 0.9.4 - 2026-09-06
+
+- Make the addressable LED colour order selectable, defaulting to the tested
+  board's `GRB`. Boards carrying an `RGB` part, such as the Waveshare
+  ESP32-C6-Zero, exchanged red and green and showed a factory-new device as a
+  green pulse instead of a red one.
+- Record the colour order in the release manifest and make both release
+  construction and flashing reject an image built for a different board.
+- Document the failure signature and the yellow BOOT-hold check that separates
+  a wrong colour order from a wrong state.
+- Add board profiles. `devkitc1` remains the reference release; `c6zero`
+  publishes the same sources built for the Waveshare ESP32-C6-Zero. The release
+  builder, the flasher, and CI all work per profile, and CI rebuilds and
+  compares both prebuilt directories byte-for-byte.
+- Add `firmware/sdkconfig.c6zero.defaults` so the variant is a committed recipe
+  rather than a documented sequence of flags.
+- Confirm on a Waveshare ESP32-C6-Zero with 8 MB flash that the `GRB` image
+  boots and shows the exchanged red and green signature, and that the `c6zero`
+  build restores correct colours. Zigbee commissioning and the CR11 action
+  matrix remain validated only on the ESP32-C6-DevKitC-1 v1.2.
+
 ## 0.9.3 - 2026-08-27
 
 - Replace the channel-25-only join configuration with standard BDB Network

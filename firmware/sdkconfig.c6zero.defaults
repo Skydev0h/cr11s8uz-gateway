@@ -1,0 +1,4 @@
+# Board profile: Waveshare ESP32-C6-Zero.
+# Its addressable LED expects RGB rather than the WS2812 GRB order used by
+# the ESP32-C6-DevKitC-1. Apply on top of sdkconfig.defaults.
+CONFIG_CR11_UI_RGB_ORDER_RGB=y

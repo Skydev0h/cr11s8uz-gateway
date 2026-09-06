@@ -8,9 +8,13 @@ import unittest
 from pathlib import Path
 
 from scripts.build_release import (
+    BOARD_PROFILES,
+    DEFAULT_BOARD,
     ReleaseError,
+    board_profile,
     build_configuration,
     compare_release_directories,
+    release_directory,
 )
 
 
@@ -24,6 +28,7 @@ class ReleaseBuilderTests(unittest.TestCase):
             "ESPTOOLPY_FLASHSIZE": "8MB",
             "ZB_ZED": True,
             "APP_REPRODUCIBLE_BUILD": True,
+            "CR11_UI_RGB_ORDER_GRB": True,
         }
         values.update(overrides)
         (config / "sdkconfig.json").write_text(
@@ -69,6 +74,34 @@ class ReleaseBuilderTests(unittest.TestCase):
             self.write_configuration(build, APP_REPRODUCIBLE_BUILD=False)
             with self.assertRaisesRegex(ReleaseError, "reproducible"):
                 build_configuration(build)
+
+    def test_rejects_a_foreign_board_led_colour_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            build = Path(temporary)
+            self.write_configuration(build, CR11_UI_RGB_ORDER_GRB=False)
+            with self.assertRaisesRegex(ReleaseError, "LED colour order"):
+                build_configuration(build)
+
+    def test_c6zero_profile_requires_the_rgb_colour_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            build = Path(temporary)
+            self.write_configuration(
+                build,
+                CR11_UI_RGB_ORDER_GRB=False,
+                CR11_UI_RGB_ORDER_RGB=True,
+            )
+            build_configuration(build, "c6zero")
+            with self.assertRaisesRegex(ReleaseError, "GRB LED colour order"):
+                build_configuration(build, DEFAULT_BOARD)
+
+    def test_unknown_board_profile_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ReleaseError, "Unknown board profile"):
+            board_profile("nosuchboard")
+
+    def test_each_profile_has_a_distinct_release_directory(self) -> None:
+        names = {release_directory("9.9.9", name).name for name in BOARD_PROFILES}
+        self.assertEqual(len(names), len(BOARD_PROFILES))
+        self.assertEqual(release_directory("9.9.9", DEFAULT_BOARD).name, "v9.9.9")
 
     def test_release_comparison_ignores_readme_but_detects_binary_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -159,3 +159,41 @@ The current partition map ends at `0x198400`, below 2 MiB. A source build can
 therefore be adapted to a 4 MB ESP32-C6 board by selecting the correct flash
 size and validating that board's pins and layout. The published prebuilt image
 remains qualified only for the listed 8 MB board.
+
+## Board profiles
+
+Addressable LEDs differ in byte order between boards, so the colour order is a
+build option rather than a constant.
+
+| Profile | Board | LED order | Prebuilt |
+|---|---|---|---|
+| `devkitc1` | ESP32-C6-DevKitC-1 v1.2, 8 MB | `GRB` | `firmware/prebuilt/v<version>/` |
+| `c6zero` | Waveshare ESP32-C6-Zero, 8 MB | `RGB` | `firmware/prebuilt/v<version>-c6zero/` |
+
+Both variants come from the same sources and the same reproducible toolchain,
+and CI rebuilds and compares each one byte-for-byte. The manifest records
+`board_profile` and `rgb_order`, and the flasher refuses a release that does not
+match the profile it was asked for:
+
+```sh
+python3 scripts/flash_firmware.py factory --board c6zero --port /dev/ttyACM0
+```
+
+`devkitc1` remains the reference board: Zigbee commissioning, the Zigbee2MQTT
+interview, and the full CR11 action matrix are validated only there.
+
+To build a profile from source, apply its defaults fragment on top of
+`sdkconfig.defaults` and keep its build directory separate:
+
+```sh
+cd firmware
+idf.py -B build-c6zero \
+  -D SDKCONFIG=sdkconfig.c6zero \
+  -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.c6zero.defaults" \
+  build
+```
+
+The colour order is also reachable interactively in `idf.py menuconfig` under
+**CR11 bridge configuration**. A board whose order is wrong exchanges red and
+green in every phase; see the troubleshooting guide for the signature and the
+check that separates it from a genuine state problem.

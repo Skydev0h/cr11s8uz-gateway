@@ -93,7 +93,7 @@ After `idf.py build`, create a new release in an unused path:
 ```sh
 ./.venv/bin/python scripts/build_release.py \
   --build-dir firmware/build \
-  --output-dir dist/v0.9.3
+  --output-dir dist/v0.9.4
 ```
 
 The release tool:
@@ -112,36 +112,40 @@ from silently mixing with older binaries.
 Verify the intended release with:
 
 ```sh
-sha256sum -c dist/v0.9.3/SHA256SUMS
+sha256sum -c dist/v0.9.4/SHA256SUMS
 ./.venv/bin/python scripts/flash_firmware.py factory \
   --port /dev/ttyACM0 --dry-run
 ```
 
 The final dry run validates the checked-in release directory, so copy the newly
-reviewed files to `firmware/prebuilt/v0.9.3` before that command.
+reviewed files to `firmware/prebuilt/v0.9.4` before that command.
 
 CI rebuilds the same source in a different workspace and compares every
 generated release artifact byte-for-byte with the checked-in prebuilt files.
 Run the same verification locally with:
 
 ```sh
-./.venv/bin/python scripts/build_release.py \
-  --build-dir firmware/build \
-  --verify-current
+./.venv/bin/python scripts/build_release.py --board devkitc1 --verify-current
+./.venv/bin/python scripts/build_release.py --board c6zero --verify-current
 ```
+
+Each board profile has its own build directory and its own prebuilt directory,
+so both must be generated and verified. `--build-dir` defaults to the profile's
+directory and only needs to be given for an unusual layout.
 
 ## Release checklist
 
 1. Update `PROJECT_VER` and the changelog. Firmware logs, the flasher, and the
    prebuilt path derive the version from `PROJECT_VER`.
-2. Build from a clean ESP-IDF tree with the locked dependencies.
+2. Build every board profile from a clean ESP-IDF tree with the locked
+   dependencies.
 3. Run host and converter tests.
 4. Flash the factory image to a clean supported board.
 5. Join it, verify interview and lease recovery, and exercise all CR11 actions.
 6. Test application-only upgrade from the previous release.
 7. Test graceful and forced reset LED paths.
-8. Generate the release directory, verify every checksum, and run the
-   byte-for-byte current-release comparison.
+8. Generate every board profile's release directory, verify every checksum, and
+   run the byte-for-byte current-release comparison for each profile.
 9. Run the repository policy and a private-data scan.
 10. Tag the exact reviewed commit. Do not regenerate binaries after tagging.
 

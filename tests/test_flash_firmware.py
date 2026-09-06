@@ -8,9 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.build_release import project_version
+from scripts.build_release import DEFAULT_BOARD, project_version
 from scripts.flash_firmware import (
     APPLICATION_IMAGE,
+    EXPECTED_RGB_ORDER,
     EXPECTED_ZIGBEE_CONFIGURATION,
     FACTORY_IMAGE,
     FIRMWARE_VERSION,
@@ -47,6 +48,8 @@ class FirmwareFlasherTests(unittest.TestCase):
             "version": FIRMWARE_VERSION,
             "target": "esp32c6",
             "zigbee": EXPECTED_ZIGBEE_CONFIGURATION,
+            "rgb_order": EXPECTED_RGB_ORDER,
+            "board_profile": DEFAULT_BOARD,
             "flash": {
                 "mode": "dio",
                 "frequency": "80m",
@@ -90,6 +93,30 @@ class FirmwareFlasherTests(unittest.TestCase):
             manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
             self.write_checksums(release)
             with self.assertRaisesRegex(FlashError, "Zigbee configuration"):
+                verify_release(release)
+
+    def test_manifest_from_a_foreign_board_build_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            release = Path(temporary)
+            self.make_release(release)
+            manifest_path = release / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["rgb_order"] = "RGB"
+            manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+            self.write_checksums(release)
+            with self.assertRaisesRegex(FlashError, "LED colour order"):
+                verify_release(release)
+
+    def test_manifest_for_another_board_profile_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            release = Path(temporary)
+            self.make_release(release)
+            manifest_path = release / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["board_profile"] = "c6zero"
+            manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+            self.write_checksums(release)
+            with self.assertRaisesRegex(FlashError, "board profile"):
                 verify_release(release)
 
     def test_commands_are_argument_arrays_with_expected_offsets(self) -> None:

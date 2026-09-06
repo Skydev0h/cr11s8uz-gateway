@@ -41,6 +41,12 @@
 #define CR11_UI_LEASE_WDT_USER         "cr11_z2m_lease"
 #define CR11_UI_LEASE_WDT_RETRY_MS     1000U
 
+#if CONFIG_CR11_UI_RGB_ORDER_RGB
+#define CR11_UI_LED_COLOR_FORMAT LED_STRIP_COLOR_COMPONENT_FMT_RGB
+#else
+#define CR11_UI_LED_COLOR_FORMAT LED_STRIP_COLOR_COMPONENT_FMT_GRB
+#endif
+
 #if !CONFIG_ESP_TASK_WDT_PANIC
 #error "CR11 supervisor lease requires CONFIG_ESP_TASK_WDT_PANIC"
 #endif
@@ -670,7 +676,7 @@ esp_err_t cr11_ui_runtime_init(const cr11_ui_runtime_config_t *config)
         .strip_gpio_num = CONFIG_CR11_UI_RGB_GPIO,
         .max_leds = 1U,
         .led_model = LED_MODEL_WS2812,
-        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB,
+        .color_component_format = CR11_UI_LED_COLOR_FORMAT,
     };
     const led_strip_rmt_config_t rmt_config = {
         .resolution_hz = 10U * 1000U * 1000U,
