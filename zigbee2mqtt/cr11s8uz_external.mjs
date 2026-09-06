@@ -23,6 +23,8 @@ const MAX_ROUTER_RECORDS = 50;
 const WAKE_QUEUE_MS = 45_000;
 const RESPONSE_TIMEOUT_MS = 2_000;
 const INSTALL_RESPONSE_TIMEOUT_MS = 45_000;
+const INSTALL_NO_ROUTE_RETRY_DELAYS_MS = Object.freeze([1_000, 2_000, 4_000]);
+const SAFE_ERROR_MAX_LENGTH = 240;
 const UPPER_HOLD_MARKER_LEVEL = 0xa5;
 const UPPER_RELEASE_MARKER_LEVEL = 0x5a;
 const UPPER_MARKER_TRANSITION_TIME = [0x00, 0x00];
@@ -95,9 +97,23 @@ function fail(message) {
     throw new Error(`CR11: ${message}`);
 }
 
-function safeErrorMessage(error) {
+function errorMessage(error) {
     const message = error instanceof Error ? error.message : String(error);
-    return message.replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, 240);
+    return message.replace(/[\u0000-\u001f\u007f]/g, " ");
+}
+
+export function safeErrorMessage(error) {
+    const message = errorMessage(error);
+    if (message.length <= SAFE_ERROR_MAX_LENGTH) return message;
+    const separator = " ... ";
+    const available = SAFE_ERROR_MAX_LENGTH - separator.length;
+    const headLength = Math.ceil(available * 0.55);
+    return `${message.slice(0, headLength)}${separator}${message.slice(-(available - headLength))}`;
+}
+
+export function isNwkNoRouteError(error) {
+    const message = errorMessage(error);
+    return /\bNWK_NO_ROUTE\b/i.test(message) || /Data request failed[^\n]*\(0xcd\)/i.test(message);
 }
 
 function rememberSetupState(deviceIeee, state) {
@@ -375,18 +391,40 @@ async function sendAwaited(entity, command, data) {
     return statusResult(command, response);
 }
 
-async function sendInstallAwaited(entity, command, data) {
-    const response = await entity.command(
-        CLUSTER_NAME,
-        command,
-        {data: Buffer.from(data)},
-        {
-            disableDefaultResponse: true,
-            timeout: INSTALL_RESPONSE_TIMEOUT_MS,
-            sendPolicy: "immediate",
-        },
-    );
-    return statusResult(command, response);
+function waitMilliseconds(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function sendInstallAwaited(entity, command, data, retry = {}) {
+    const delays = retry.delays ?? INSTALL_NO_ROUTE_RETRY_DELAYS_MS;
+    const wait = retry.wait ?? waitMilliseconds;
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            const response = await entity.command(
+                CLUSTER_NAME,
+                command,
+                {data: Buffer.from(data)},
+                {
+                    disableDefaultResponse: true,
+                    timeout: INSTALL_RESPONSE_TIMEOUT_MS,
+                    sendPolicy: "immediate",
+                },
+            );
+            return statusResult(command, response);
+        } catch (error) {
+            const delay = delays[attempt];
+            if (!isNwkNoRouteError(error) || delay === undefined) throw error;
+            retry.onRetry?.({
+                command,
+                failed_attempt: attempt + 1,
+                next_attempt: attempt + 2,
+                max_attempts: delays.length + 1,
+                delay_ms: delay,
+                error: safeErrorMessage(error),
+            });
+            await wait(delay);
+        }
+    }
 }
 
 async function sendQuery(entity, data, assumeAwake) {
@@ -432,6 +470,11 @@ export function executeCommand(entity, value, meta, context = {}) {
     if (typeof input.op !== "string") fail("op must be a string");
     const op = input.op.toLowerCase();
     const uiOperation = context.uiOperation;
+    const installRetry = {
+        delays: context.installRetryDelays,
+        wait: context.installRetryWait,
+        onRetry: context.onInstallRetry,
+    };
     if (uiOperation !== undefined && uiOperation !== "gateway" && uiOperation !== "direct") {
         fail("invalid internal UI operation context");
     }
@@ -462,9 +505,9 @@ export function executeCommand(entity, value, meta, context = {}) {
                 seen_responses: new Set(),
             });
             try {
-                const results = [await sendInstallAwaited(entity, "clearBig", Buffer.alloc(0))];
+                const results = [await sendInstallAwaited(entity, "clearBig", Buffer.alloc(0), installRetry)];
                 for (const record of records) {
-                    results.push(await sendInstallAwaited(entity, "addBig", encodeBigAction(record)));
+                    results.push(await sendInstallAwaited(entity, "addBig", encodeBigAction(record), installRetry));
                 }
                 routingModeByDevice.set(deviceIeee, mode);
                 pendingRouterInstalls.delete(deviceIeee);
@@ -489,7 +532,7 @@ export function executeCommand(entity, value, meta, context = {}) {
                 seen_responses: new Set(),
             });
             try {
-                const result = await sendInstallAwaited(entity, "clearBig", Buffer.alloc(0));
+                const result = await sendInstallAwaited(entity, "clearBig", Buffer.alloc(0), installRetry);
                 routingModeByDevice.delete(deviceIeee);
                 pendingRouterInstalls.delete(deviceIeee);
                 return {op, status: "success", mode: "direct", commands: [result]};

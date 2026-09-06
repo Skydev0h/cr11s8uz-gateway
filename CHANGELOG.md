@@ -11,6 +11,9 @@ backups and physical captures made between 2026-08-24 and 2026-08-26.
 - Preserve the canonical `CR11S8UZ` model identity in the external converter
   so Zigbee2MQTT retains the standard device image while exposing all eight
   buttons and gateway configuration controls.
+- Retry only definite `NWK_NO_ROUTE` failures during an awake CR11 action-table
+  install with bounded backoff, and preserve the transport-cause tail of long
+  setup errors instead of truncating the useful part.
 
 ## 0.9.3 - 2026-08-27
 

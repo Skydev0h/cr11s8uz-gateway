@@ -7,8 +7,10 @@ import definition, {
     discoverCr11Gateway,
     executeCommand,
     fzAssignmentMode,
+    isNwkNoRouteError,
     protocolResponse,
     routerPlan,
+    safeErrorMessage,
     tzCr11Human,
 } from "../cr11s8uz_external.mjs";
 
@@ -23,6 +25,22 @@ function assignmentMode(device, value) {
 test("preserves the canonical model identity used by the frontend image catalog", () => {
     assert.equal(definition.model, "CR11S8UZ");
     assert.equal(definition.vendor, "ORVIBO");
+});
+
+test("long setup errors retain both command context and the transport cause", () => {
+    const raw = `ZCL command ${"x".repeat(300)} failed (Data request failed with error: 'NWK_NO_ROUTE' (0xcd))`;
+    const safe = safeErrorMessage(new Error(raw));
+    assert.equal(safe.length, 240);
+    assert.match(safe, /^ZCL command/);
+    assert.match(safe, /NWK_NO_ROUTE/);
+    assert.match(safe, /0xcd/);
+});
+
+test("no-route classification is narrow", () => {
+    assert.equal(isNwkNoRouteError(new Error("Data request failed: NWK_NO_ROUTE (0xcd)")), true);
+    assert.equal(isNwkNoRouteError(new Error("Data request failed with code (0xcd)")), true);
+    assert.equal(isNwkNoRouteError(new Error("APS timeout waiting for a response")), false);
+    assert.equal(isNwkNoRouteError(new Error("device status 0xcd")), false);
 });
 
 function registryDeviceClass() {
@@ -219,6 +237,99 @@ test("install progress is driven to success by actual device responses", async (
     assert.equal(progress.at(-1).records_expected, 12);
     assert.equal(progress.at(-1).status, "success");
     assert.equal(device.pendingRequestTimeout, 5_000);
+});
+
+test("install retries only definite NWK_NO_ROUTE failures with bounded backoff", async () => {
+    const ieeeAddr = "0x0123456789abc002";
+    const device = {
+        ieeeAddr,
+        pendingRequestTimeout: 5_000,
+        addCustomCluster() {},
+    };
+    assignmentMode(device, 0);
+    const commands = [];
+    const waits = [];
+    const retries = [];
+    const entity = {
+        async command(cluster, command) {
+            assert.equal(cluster, "manuSpecificCr11S8uz");
+            commands.push(command);
+            if (commands.length === 1) {
+                throw new Error(
+                    "ZCL command failed (Data request failed with error: 'NWK_NO_ROUTE' (0xcd))",
+                );
+            }
+            return {data: Buffer.from([0x00])};
+        },
+    };
+
+    const result = await executeCommand(
+        entity,
+        {
+            op: "install_router",
+            target_ieee: "0x1020304050607080",
+            target_endpoints: [10, 11, 12, 13],
+            mode: "four-target",
+            confirm: "replace_big_actions",
+        },
+        {device},
+        {
+            installRetryDelays: [1_000, 2_000],
+            installRetryWait: async (delay) => waits.push(delay),
+            onInstallRetry: (retry) => retries.push(retry),
+        },
+    );
+
+    assert.equal(result.status, "success");
+    assert.deepEqual(commands.slice(0, 2), ["clearBig", "clearBig"]);
+    assert.equal(commands.length, 14);
+    assert.deepEqual(waits, [1_000]);
+    assert.deepEqual(retries, [
+        {
+            command: "clearBig",
+            failed_attempt: 1,
+            next_attempt: 2,
+            max_attempts: 3,
+            delay_ms: 1_000,
+            error: "ZCL command failed (Data request failed with error: 'NWK_NO_ROUTE' (0xcd))",
+        },
+    ]);
+});
+
+test("install does not replay an ambiguous transport failure", async () => {
+    const device = {
+        ieeeAddr: "0x0123456789abc004",
+        pendingRequestTimeout: 5_000,
+        addCustomCluster() {},
+    };
+    assignmentMode(device, 0);
+    let calls = 0;
+    const waits = [];
+    await assert.rejects(
+        executeCommand(
+            {
+                async command() {
+                    calls += 1;
+                    throw new Error("APS timeout waiting for a response");
+                },
+            },
+            {
+                op: "install_router",
+                target_ieee: "0x1020304050607080",
+                target_endpoint: 10,
+                mode: "independent",
+                confirm: "replace_big_actions",
+            },
+            {device},
+            {
+                installRetryDelays: [1_000],
+                installRetryWait: async (delay) => waits.push(delay),
+            },
+        ),
+        /APS timeout/,
+    );
+    assert.equal(calls, 1);
+    assert.deepEqual(waits, []);
 });
 
 test("duplicate response TSNs do not advance install progress", async () => {
